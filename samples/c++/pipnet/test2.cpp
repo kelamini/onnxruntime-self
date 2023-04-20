@@ -19,15 +19,17 @@ void PreProcess(const cv::Mat& image, cv::Mat& image_blob)
 	cv::Mat input;
 	image.copyTo(input);
 
-
 	//数据处理 标准化
 	std::vector<cv::Mat> channels, channel_p;
-	split(input, channels);
+	cv::split(input, channels);
 	cv::Mat R, G, B;
 	B = channels.at(0);
 	G = channels.at(1);
 	R = channels.at(2);
 
+    // (tensor - mean) / std
+    // normalize = (mean=[0.485, 0.456, 0.406],
+    //               std=[0.229, 0.224, 0.225])
 	B = (B / 255. - 0.406) / 0.225;
 	G = (G / 255. - 0.456) / 0.224;
 	R = (R / 255. - 0.485) / 0.229;
@@ -37,16 +39,13 @@ void PreProcess(const cv::Mat& image, cv::Mat& image_blob)
 	channel_p.push_back(B);
 
 	cv::Mat outt;
-	merge(channel_p, outt);
+	cv::merge(channel_p, outt);
 	image_blob = outt;
 }
 
 
 int main(int argc, char* argv[])
 {
-    //记录程序运行时间
-    auto start_time = clock();
-
     //初始化环境，每个进程一个环境
     //环境保留了线程池和其他状态信息
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
@@ -76,19 +75,27 @@ int main(int argc, char* argv[])
     size_t num_output_nodes = session.GetOutputCount();
     printf("num_output_nodes: %d\n", num_output_nodes);
 
-    // std::vector<const char*> input_node_names(num_input_nodes);
-    // std::vector<const char*> output_node_names(num_output_nodes);
     std::vector<const char*> input_node_names = {"input_img_3x256x256"};
     std::vector<const char*> output_node_names = {"outputs_cls_98x8x8", \
                                                   "outputs_x_98x8x8", \
                                                   "outputs_y_98x8x8", \
                                                   "outputs_nb_x_980x8x8", \
                                                   "outputs_nb_y_980x8x8"};
+    // std::vector<const char*> input_node_names = {"input.1"};
+    // std::vector<const char*> output_node_names = {"score_8", \
+    //                                               "score_16", \
+    //                                               "score_32", \
+    //                                               "bbox_8", \
+    //                                               "bbox_16", \
+    //                                               "bbox_32", \
+    //                                               "kps_8", \
+    //                                               "kps_16", \
+    //                                               "kps_32"};
     std::vector<int64_t> input_node_dims;
 
     bool dynamic_flag = false;
 
-    //迭代所有的输入节点
+    //打印输入节点信息
     for (int i = 0; i < num_input_nodes; i++) {
          //输出输入节点的名称
         Ort::AllocatedStringPtr input_name_Ptr = session.GetInputNameAllocated(i, allocator);
@@ -112,10 +119,8 @@ int main(int argc, char* argv[])
                 dynamic_flag  = true;
             }
         }
-
-        // input_node_dims[0] = 1;
     }
-    //打印输出节点信息，方法类似
+    //打印输出节点信息
     for (int i = 0; i < num_output_nodes; i++)
     {
         Ort::AllocatedStringPtr output_name_Ptr = session.GetOutputNameAllocated(i, allocator);
@@ -134,45 +139,56 @@ int main(int argc, char* argv[])
         }
     }
 
-    // 使用样本数据对模型进行评分，并检验出入值的合法性
-    size_t input_tensor_size = 3 * 256 * 256;
-    std::vector<float> input_tensor_values(input_tensor_size);
+    // // 使用样本数据对模型进行评分，并检验出入值的合法性
+    // size_t input_tensor_size = 3 * 256 * 256;
+    // std::vector<float> input_tensor_values(input_tensor_size);
 
-    // 初始化一个数据（演示用,这里实际应该传入归一化的数据）
-    for (unsigned int i = 0; i < input_tensor_size; i++)
-        input_tensor_values[i] = (float)i / (input_tensor_size + 1);
+    // // 初始化一个数据（演示用,这里实际应该传入归一化的数据）
+    // for (unsigned int i = 0; i < input_tensor_size; i++)
+    //     input_tensor_values[i] = (float)i / (input_tensor_size + 1);
 
-    // OrtValue * input_val = nullptr;
+    // // OrtValue * input_val = nullptr;
 
-    // 为输入数据创建一个Tensor对象
-    std::vector<int64_t> input_shape = {1, 3, 256, 256};
-    auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(), input_tensor_size, input_shape.data(), 4);
-    assert(input_tensor.IsTensor());
+    // // 为输入数据创建一个Tensor对象
+    // std::vector<int64_t> input_shape = {1, 3, 256, 256};
+    // auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    // Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(), input_tensor_size, input_shape.data(), 4);
+    // assert(input_tensor.IsTensor());
 
+	//加载图片
+    int rewight = 256;
+    int reheight = 256;
+	cv::Mat img = cv::imread("/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/data/demo.jpeg");
+	cv::Mat det1, det2;
+	cv::resize(img, det1, cv::Size(rewight, reheight), cv::INTER_AREA);
+	det1.convertTo(det1, CV_32FC3);
+	PreProcess(det1, det2);         //标准化处理
+	cv::Mat blob = cv::dnn::blobFromImage(det2, 1., cv::Size(rewight, reheight), cv::Scalar(0, 0, 0), true, CV_8U);
+	printf("Load imgs success!\n");
+
+	//创建输入tensor
+	auto memory_info = Ort::MemoryInfo::CreateCpu(OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+	std::vector<Ort::Value> input_tensors;
+	input_tensors.emplace_back(Ort::Value::CreateTensor<float>(memory_info, blob.ptr<float>(), blob.total(), input_node_dims.data(), input_node_dims.size()));
+	std::cout << "blob.total: " << blob.total() << std::endl;
+
+    clock_t startTime, endTime;
     try
     {
         // 推理得到结果
-        // std::cout << "input_node_names: " << input_node_names.data() << std::endl;
-        auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_node_names.data(), &input_tensor, num_input_nodes, output_node_names.data(), num_output_nodes);
+	    startTime = clock();
+        auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_node_names.data(), input_tensors.data(), input_node_names.size(), output_node_names.data(), output_node_names.size());
         assert(output_tensors.size() == num_output_nodes && output_tensors.front().IsTensor());
+        printf("Number of outputs = %d\n", output_tensors.size());
+        endTime = clock();
 
         // Get pointer to output tensor float values
         for (int i = 0; i < num_output_nodes; i++)
         {
             float* floatarr = output_tensors[i].GetTensorMutableData<float>();
-            printf("Output_tensors value = %f\n", floatarr);
+            printf("Output_tensors value = %.5f\n", floatarr);
+            std::cout << "Output_tensors front: " << floatarr[i] << std::endl;
         }
-
-        // // 另一种形式
-        // Ort::IoBinding io_binding{session};
-        // io_binding.BindInput("input_img_3x256x256", input_tensor);
-        // Ort::MemoryInfo output_mem_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-        // // std::vector<const char*> outputnames = {"outputs_cls_98x8x8", "outputs_x_98x8x8", "outputs_y_98x8x8", "outputs_nb_x_980x8x8", "outputs_nb_y_980x8x8"};
-        // io_binding.BindOutput("outputs_cls_98x8x8", output_mem_info);
-        // session.Run(Ort::RunOptions{ nullptr }, io_binding);
-
-        printf("Number of outputs = %d\n", output_tensors.size());
     }
 
     catch (Ort::Exception& e)
@@ -180,8 +196,7 @@ int main(int argc, char* argv[])
         printf(e.what());
     }
 
-    auto end_time = clock();
-    printf("Proceed exit after %.2f seconds\n", static_cast<float>(end_time - start_time) / CLOCKS_PER_SEC);
+    printf("Proceed exit after %.2f seconds\n", static_cast<float>(endTime - startTime) / CLOCKS_PER_SEC);
     printf("Done!\n");
     return 0;
 }
