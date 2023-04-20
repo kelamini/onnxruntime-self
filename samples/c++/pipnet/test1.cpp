@@ -49,9 +49,9 @@ int main(int argc, char* argv[]) {
     // URL = https://github.com/onnx/models/tree/master/squeezenet
     OrtSession* session;
 #ifdef _WIN32
-    const wchar_t* model_path = L"F:/senet_50.onnx";
+    const wchar_t* model_path = L"samples/c++/pipnet/weights_onnx/pipnet_mv3_wflw98_256x256_sim.onnx";
 #else
-    const char* model_path = "F:/senet_50.onnx";
+    const char* model_path = "samples/c++/pipnet/weights_onnx/pipnet_mv3_wflw98_256x256_sim.onnx";
 #endif
 
     printf("Using Onnxruntime C API\n");
@@ -120,11 +120,11 @@ int main(int argc, char* argv[]) {
     //*************************************************************************
     // Score the model using sample data, and inspect values
 
-    size_t input_tensor_size = 224 * 224 * 3;  // simplify ... using known dim values to calculate size
+    size_t input_tensor_size = 3 * 256 * 256;  // simplify ... using known dim values to calculate size
                                                // use OrtGetTensorShapeElementCount() to get official size!
 
     std::vector<float> input_tensor_values(input_tensor_size);
-    std::vector<const char*> output_node_names = { "output1" }; // 输出节点
+    std::vector<const char*> output_node_names = { "outputs_cls_98x8x8", "outputs_x_98x8x8", "outputs_y_98x8x8", "outputs_nb_x_980x8x8", "outputs_nb_y_980x8x8" }; // 输出节点
 
     // initialize input data with values in [0.0, 1.0]
     // 这里用的是直接赋值
@@ -147,7 +147,7 @@ int main(int argc, char* argv[]) {
     OrtValue* output_tensor = NULL;
     //while (true)
     //{
-    CheckStatus(g_ort->Run(session, NULL, input_node_names.data(), (const OrtValue* const*)&input_tensor, 1, output_node_names.data(), 1, &output_tensor));
+    CheckStatus(g_ort->Run(session, NULL, input_node_names.data(), (const OrtValue* const*)&input_tensor, 1, output_node_names.data(), 5, &output_tensor));
     CheckStatus(g_ort->IsTensor(output_tensor, &is_tensor));
     assert(is_tensor);
 

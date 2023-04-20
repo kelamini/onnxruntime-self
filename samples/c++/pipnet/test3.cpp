@@ -80,7 +80,7 @@ int main()         // 返回值为整型带参的main函数. 函数体内使用�
 	Ort::SessionOptions session_options;
 	// 使用1个线程执行op,若想提升速度，增加线程数
 	session_options.SetIntraOpNumThreads(1);
-	CUDA加速开启(由于onnxruntime的版本太高，无cuda_provider_factory.h的头文件，加速可以使用onnxruntime V1.8的版本)
+	//CUDA加速开启(由于onnxruntime的版本太高，无cuda_provider_factory.h的头文件，加速可以使用onnxruntime V1.8的版本)
 	//OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0);
 	// ORT_ENABLE_ALL: 启用所有可能的优化
 	session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
@@ -108,10 +108,14 @@ int main()         // 返回值为整型带参的main函数. 函数体内使用�
 	printf("Number of inputs = %zu\n", num_input_nodes);
 	printf("Number of output = %zu\n", num_output_nodes);
 	//获取输入name
-	const char* input_name = session.GetInputName(0, allocator);
+	Ort::AllocatedStringPtr input_name_Ptr = session.GetOutputNameAllocated(0, allocator);
+	char* input_name = input_name_Ptr.get();
+	// const char* input_name = session.GetInputName(0, allocator);
 	std::cout << "input_name:" << input_name << std::endl;
 	//获取输出name
-	const char* output_name = session.GetOutputName(0, allocator);
+	Ort::AllocatedStringPtr output_name_Ptr = session.GetOutputNameAllocated(0, allocator);
+	char* output_name = output_name_Ptr.get();
+	// const char* output_name = session.GetOutputName(0, allocator);
 	std::cout << "output_name: " << output_name << std::endl;
     // 自动获取维度数量
 	auto input_dims = session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
@@ -141,16 +145,17 @@ int main()         // 返回值为整型带参的main函数. 函数体内使用�
 	/*cout << int(input_dims.size()) << endl;*/
 	startTime = clock();
 
-	推理(score model & input tensor, get back output tensor)
+	// 推理(score model & input tensor, get back output tensor)
 	auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_node_names.data(), input_tensors.data(), input_names.size(), output_node_names.data(), output_node_names.size());
 	endTime = clock();
 	assert(output_tensors.size() == 1 && output_tensors.front().IsTensor());
+
 	//除了第一个节点外，其他参数与原网络对应不上程序就会无法执行
 	//第二个参数代表输入节点的名称集合
     //第四个参数1代表输入层的数目
 	//第五个参数代表输出节点的名称集合
 	//最后一个参数代表输出节点的数目
-	  获取输出(Get pointer to output tensor float values)
+	//   获取输出(Get pointer to output tensor float values)
 	float* floatarr = output_tensors[0].GetTensorMutableData<float>();     // 也可以使用output_tensors.front(); 获取list中的第一个元素变量  list.pop_front(); 删除list中的第一个位置的元素
 	// 得到最可能分类输出
 	Mat newarr = Mat_<double>(1, 1000); //定义一个1*1000的矩阵
@@ -179,7 +184,7 @@ int main()         // 返回值为整型带参的main函数. 函数体内使用�
 		waitKey(0);
 	}
 
-	 计算运行时间
+	//  计算运行时间
 	std::cout << "The run time is:" << (double)(endTime - startTime) / CLOCKS_PER_SEC << "s" << std::endl;
 	printf("Done!\n");
 	system("pause");
