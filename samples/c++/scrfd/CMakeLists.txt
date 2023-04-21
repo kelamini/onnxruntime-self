@@ -1,4 +1,4 @@
-project(capi_test)
+project(scrfd_test)
 
 set(CMAKE_BUILD_TYPE Debug)
 
@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.22)
 
 set(ONNXRUNTIME_ROOTDIR /home/kelamini/workspace/onnxruntime)
 
-set(OBJ test2.cpp)
+set(OBJ demo.cpp scrfd.cpp)
 
 # # tensorrt_provider_factory.h contains old APIs of the tensorrt execution provider
 # include(CheckIncludeFileCXX)
@@ -24,9 +24,9 @@ include_directories(
 find_package(OpenCV REQUIRED)
 
 
-ADD_EXECUTABLE(capi_test  ${OBJ})
+ADD_EXECUTABLE(scrfd_test  ${OBJ})
 # if(HAVE_TENSORRT_PROVIDER_FACTORY_H)
 #   target_compile_definitions(capi_test PRIVATE -DHAVE_TENSORRT_PROVIDER_FACTORY_H)
 # endif()
-target_link_libraries(capi_test onnxruntime)
-target_link_libraries(capi_test ${OpenCV_LIBS})
+target_link_libraries(scrfd_test onnxruntime)
+target_link_libraries(scrfd_test ${OpenCV_LIBS})

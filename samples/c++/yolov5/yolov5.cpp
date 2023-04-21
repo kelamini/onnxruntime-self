@@ -1,14 +1,14 @@
-#include "face_keypoints.hpp"
+#include "yolov5.hpp"
 
 
-PiPNet::PiPNet(Configuration config)
+YOLOv5::YOLOv5(Configuration config)
 {
 	this->confThreshold = config.confThreshold;
 	this->nmsThreshold = config.nmsThreshold;
 	this->objThreshold = config.objThreshold;
 	this->num_classes = sizeof(this->classes)/sizeof(this->classes[0]);  // 类别数量
-	this->inpHeight = 256;
-	this->inpWidth = 256;
+	this->inpHeight = 640;
+	this->inpWidth = 640;
 
 	string model_path = config.modelpath;
 	//std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  //用于UTF-16编码的字符
@@ -26,7 +26,9 @@ PiPNet::PiPNet(Configuration config)
 	AllocatorWithDefaultOptions allocator;   // 配置输入输出节点内存
 	for (int i = 0; i < numInputNodes; i++)
 	{
-		input_names.push_back(ort_session->GetInputNameAllocated(i, allocator).get());		// 内存
+
+		// AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);
+		// input_names.push_back(input_name_Ptr.get());		// 内存
 		Ort::TypeInfo input_type_info = ort_session->GetInputTypeInfo(i);   // 类型
 		auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();  //
 		auto input_dims = input_tensor_info.GetShape();    // 输入shape
@@ -34,7 +36,8 @@ PiPNet::PiPNet(Configuration config)
 	}
 	for (int i = 0; i < numOutputNodes; i++)
 	{
-		output_names.push_back(ort_session->GetOutputNameAllocated(i, allocator).get());
+		// AllocatedStringPtr output_name_Ptr = ort_session->GetOutputNameAllocated(i, allocator);
+		// output_names.push_back(output_name_Ptr.get());
 		Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
 		auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
 		auto output_dims = output_tensor_info.GetShape();
@@ -47,7 +50,7 @@ PiPNet::PiPNet(Configuration config)
 
 }
 
-Mat PiPNet::resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left)
+Mat YOLOv5::resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left)
 {
 	int srch = srcimg.rows, srcw = srcimg.cols;
 	*newh = this->inpHeight;
@@ -76,7 +79,7 @@ Mat PiPNet::resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left)
 	return dstimg;
 }
 
-void PiPNet::normalize_(Mat img)
+void YOLOv5::normalize_(Mat img)
 {
 	//    img.convertTo(img, CV_32F);
 	int row = img.rows;
@@ -96,7 +99,7 @@ void PiPNet::normalize_(Mat img)
 	}
 }
 
-void PiPNet::nms(vector<BoxInfo>& input_boxes)
+void YOLOv5::nms(vector<BoxInfo>& input_boxes)
 {
 	sort(input_boxes.begin(), input_boxes.end(), [](BoxInfo a, BoxInfo b) { return a.score > b.score; }); // 降序排列
 	vector<float> vArea(input_boxes.size());
@@ -170,7 +173,7 @@ void PiPNet::nms(vector<BoxInfo>& input_boxes)
 	// input_boxes.erase(remove_if(input_boxes.begin(), input_boxes.end(), [&idx_t, &remove_flags](const BoxInfo& f) { return remove_flags[idx_t++]; }), input_boxes.end());
 }
 
-void PiPNet::detect(Mat& frame)
+void YOLOv5::detect(Mat& frame)
 {
 	int newh = 0, neww = 0, padh = 0, padw = 0;
 	Mat dstimg = this->resize_image(frame, &newh, &neww, &padh, &padw);
@@ -233,6 +236,6 @@ void PiPNet::detect(Mat& frame)
 		rectangle(frame, Point(xmin, ymin), Point(int(generate_boxes[i].x2), int(generate_boxes[i].y2)), Scalar(0, 0, 255), 2);
 		string label = format("%.2f", generate_boxes[i].score);
 		label = this->classes[generate_boxes[i].label] + ":" + label;
-		putText(frame, label, Point(xmin, ymin - 5), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0, 255, 0), 1);
+		putText(frame, label, Point(xmin, ymin - 5), FONT_HERSHEY_SIMPLEX, 2, Scalar(255, 0, 255), 2);
 	}
 }

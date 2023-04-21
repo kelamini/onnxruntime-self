@@ -1,20 +1,4 @@
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc_c.h>
-#include <opencv2/dnn.hpp>
-
-#include <assert.h>
-#include <vector>
-#include <iostream>
-#include <ctime>
-#include "face_keypoints.hpp"
-
-using namespace std;
-using namespace cv;
-using namespace cv::dnn;
+#include "test2.hpp"
 
 
 // 图像处理  标准化处理
@@ -47,9 +31,12 @@ void PreProcess(const Mat& image, Mat& image_blob)
 	image_blob = outt;
 }
 
-
 int main(int argc, char* argv[])
 {
+    // 模型输入图像的宽高
+    int rewidth;
+    int reheight;
+
     //初始化环境，每个进程一个环境
     //环境保留了线程池和其他状态信息
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
@@ -63,8 +50,8 @@ int main(int argc, char* argv[])
 	const wchar_t* model_path = L"/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/pipnet_mv3_wflw98_256x256_sim.onnx";
     // const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/scrfd_768_432.onnx";
 #else
-	const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/pipnet_mv3_wflw98_256x256_sim.onnx";
-    // const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/scrfd_768_432.onnx";
+	// const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/pipnet_mv3_wflw98_256x256_sim.onnx";
+    const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/scrfd_768_432.onnx";
 #endif
 
     // 创建Session并把模型加载到内存中
@@ -75,26 +62,26 @@ int main(int argc, char* argv[])
 
     //输出模型 输入/输出 节点的数量
     size_t num_input_nodes = session.GetInputCount();
-    printf("num_input_nodes: %d\n", num_input_nodes);
+    printf("num_input_nodes: %ld\n", num_input_nodes);
     size_t num_output_nodes = session.GetOutputCount();
-    printf("num_output_nodes: %d\n", num_output_nodes);
+    printf("num_output_nodes: %ld\n", num_output_nodes);
 
-    std::vector<const char*> input_node_names = {"input_img_3x256x256"};
-    std::vector<const char*> output_node_names = {"outputs_cls_98x8x8", \
-                                                  "outputs_x_98x8x8", \
-                                                  "outputs_y_98x8x8", \
-                                                  "outputs_nb_x_980x8x8", \
-                                                  "outputs_nb_y_980x8x8"};
-    // std::vector<const char*> input_node_names = {"input.1"};
-    // std::vector<const char*> output_node_names = {"score_8", \
-    //                                               "score_16", \
-    //                                               "score_32", \
-    //                                               "bbox_8", \
-    //                                               "bbox_16", \
-    //                                               "bbox_32", \
-    //                                               "kps_8", \
-    //                                               "kps_16", \
-    //                                               "kps_32"};
+    // std::vector<const char*> input_node_names = {"input_img_3x256x256"};
+    // std::vector<const char*> output_node_names = {"outputs_cls_98x8x8", \
+    //                                               "outputs_x_98x8x8", \
+    //                                               "outputs_y_98x8x8", \
+    //                                               "outputs_nb_x_980x8x8", \
+    //                                               "outputs_nb_y_980x8x8"};
+    std::vector<const char*> input_node_names = {"input.1"};
+    std::vector<const char*> output_node_names = {"score_8", \
+                                                  "score_16", \
+                                                  "score_32", \
+                                                  "bbox_8", \
+                                                  "bbox_16", \
+                                                  "bbox_32", \
+                                                  "kps_8", \
+                                                  "kps_16", \
+                                                  "kps_32"};
     std::vector<int64_t> input_node_dims;
 
     bool dynamic_flag = false;
@@ -118,6 +105,14 @@ int main(int argc, char* argv[])
         for (int j = 0; j < input_node_dims.size(); j++)
         {
             printf("Input %d : dim %d=%jd\n", i, j, input_node_dims[j]);
+            if (j == 2)
+            {
+                rewidth = input_node_dims[j];
+            }
+            if (j == 3)
+            {
+                reheight = input_node_dims[j];
+            }
             if (input_node_dims[j] < 1)
             {
                 dynamic_flag  = true;
@@ -159,78 +154,84 @@ int main(int argc, char* argv[])
     // Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(), input_tensor_size, input_shape.data(), 4);
     // assert(input_tensor.IsTensor());
 
-    int camera_device = parser.get<int>("camera");
     VideoCapture capture;
     //-- 2. Read the video stream
-    capture.open( camera_device );
+    capture.open( 0 );
     if ( ! capture.isOpened() )
     {
         cout << "--(!)Error opening video capture\n";
         return -1;
     }
 
-    Mat frame;
-    while ( capture.read(frame) )
+    Mat img;
+    while ( capture.read(img) )
     {
-        if( frame.empty() )
+        if( img.empty() )
         {
             cout << "--(!) No captured frame -- Break!\n";
             break;
         }
 
-        //-- 3. Apply the classifier to the frame
-        detectAndDisplay( frame );
-
-        if( waitKey(10) == 27 )
+        if( waitKey(1) == 27 )
         {
             break; // escape
         }
-    }
 
+        //加载图片
+        // Mat img = imread("/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/data/demo.jpeg");
+        Mat det1, det2;
+        resize(img, det1, Size(rewidth, reheight), INTER_AREA);
+        det1.convertTo(det1, CV_32FC3);
+        PreProcess(det1, det2);         //标准化处理
+        Mat blob = dnn::blobFromImage(det2, 1., Size(rewidth, reheight), Scalar(0, 0, 0), true, CV_8U);
+        printf("Preprocess success!\n");
 
-	//加载图片
-    int rewight = 256;
-    int reheight = 256;
-	Mat img = imread("/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/data/demo.jpeg");
-	Mat det1, det2;
-	resize(img, det1, Size(rewight, reheight), INTER_AREA);
-	det1.convertTo(det1, CV_32FC3);
-	PreProcess(det1, det2);         //标准化处理
-	Mat blob = dnn::blobFromImage(det2, 1., Size(rewight, reheight), Scalar(0, 0, 0), true, CV_8U);
-	printf("Load imgs success!\n");
+        //创建输入tensor
+        auto memory_info = Ort::MemoryInfo::CreateCpu(OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+        std::vector<Ort::Value> input_tensors;
+        input_tensors.emplace_back(Ort::Value::CreateTensor<float>(memory_info, blob.ptr<float>(), blob.total(), input_node_dims.data(), input_node_dims.size()));
+        std::cout << "imgs_total(B x C x W x H): " << blob.total() << std::endl;
 
-	//创建输入tensor
-	auto memory_info = Ort::MemoryInfo::CreateCpu(OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
-	std::vector<Ort::Value> input_tensors;
-	input_tensors.emplace_back(Ort::Value::CreateTensor<float>(memory_info, blob.ptr<float>(), blob.total(), input_node_dims.data(), input_node_dims.size()));
-	std::cout << "blob.total: " << blob.total() << std::endl;
-
-    clock_t startTime, endTime;
-    try
-    {
-        // 推理得到结果
-	    startTime = clock();
-        auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_node_names.data(), input_tensors.data(), input_node_names.size(), output_node_names.data(), output_node_names.size());
-        assert(output_tensors.size() == num_output_nodes && output_tensors.front().IsTensor());
-        printf("Number of outputs = %d\n", output_tensors.size());  // 输出的节点数
-        endTime = clock();
-
-        // Get pointer to output tensor float values
-        for (int i = 0; i < num_output_nodes; i++)
+        clock_t startTime, endTime;
+        try
         {
-            // float* floatarr = output_tensors[i].GetTensorMutableData<float>();
-            std::cout << "output_tensor_size: " << output_tensors[i].GetTensorTypeAndShapeInfo().GetShape().size() << std::endl;   // 输出当前节点的维度大小
-            // std::cout << "output_tensor_size: " << output_tensors[i].GetTensorData<float>() << std::endl;   //
-            // std::cout << "Output_tensors lens: " << output_tensors[i] << std::endl;
+            // 推理得到结果
+            startTime = clock();
+            auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_node_names.data(), input_tensors.data(), input_node_names.size(), output_node_names.data(), output_node_names.size());
+            assert(output_tensors.size() == num_output_nodes && output_tensors.front().IsTensor());
+            printf("Number of outputs = %ld\n", output_tensors.size());  // 输出的节点数
+            endTime = clock();
+
+            // Get pointer to output tensor float values
+            for (int i = 0; i < num_output_nodes; i++)
+            {
+                // float* floatarr = output_tensors[i].GetTensorMutableData<float>();
+                std::cout << "output_tensor_size: " << output_tensors[i].GetTensorTypeAndShapeInfo().GetShape().size() << std::endl;   // 输出当前节点的维度大小
+                // std::cout << "Output_tensors lens: " << output_tensors[i] << std::endl;
+            }
         }
-    }
 
-    catch (Ort::Exception& e)
-    {
-        printf(e.what());
-    }
+        catch (Ort::Exception& e)
+        {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
 
-    printf("Proceed exit after %.2f seconds\n", static_cast<float>(endTime - startTime) / CLOCKS_PER_SEC);
-    printf("Done!\n");
+        // fps
+        double fps = capture.get(CAP_PROP_FPS);
+        string fps_str = to_string((int)fps);
+        putText(img, "FPS: "+fps_str, Point(50, 50), 2, 1, (255, 0, 0), 1);
+
+        // img_width, img_height
+        int height = img.rows;
+        string height_str = to_string(height);
+        int width = img.cols;
+        string width_str = to_string(width);
+        putText(img, "(width, height): ("+width_str+", "+height_str+")", Point(50, 80), 2, 1, (255, 0, 0), 1);
+
+        imshow( "DMS", img );
+
+        printf("Proceed exit after %.2f seconds\n", static_cast<float>(endTime - startTime) / CLOCKS_PER_SEC);
+        printf("Done!\n");
+    }
     return 0;
 }

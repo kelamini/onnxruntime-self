@@ -1,14 +1,14 @@
-#include "face_keypoints.hpp"
+#include "scrfd.hpp"
 
 
-PiPNet::PiPNet(Configuration config)
+YOLOv5::YOLOv5(Configuration config)
 {
 	this->confThreshold = config.confThreshold;
 	this->nmsThreshold = config.nmsThreshold;
 	this->objThreshold = config.objThreshold;
 	this->num_classes = sizeof(this->classes)/sizeof(this->classes[0]);  // 类别数量
-	this->inpHeight = 256;
-	this->inpWidth = 256;
+	this->inpHeight = 640;
+	this->inpWidth = 640;
 
 	string model_path = config.modelpath;
 	//std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  //用于UTF-16编码的字符
@@ -47,7 +47,7 @@ PiPNet::PiPNet(Configuration config)
 
 }
 
-Mat PiPNet::resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left)
+Mat YOLOv5::resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left)
 {
 	int srch = srcimg.rows, srcw = srcimg.cols;
 	*newh = this->inpHeight;
@@ -76,7 +76,7 @@ Mat PiPNet::resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left)
 	return dstimg;
 }
 
-void PiPNet::normalize_(Mat img)
+void YOLOv5::normalize_(Mat img)
 {
 	//    img.convertTo(img, CV_32F);
 	int row = img.rows;
@@ -96,7 +96,7 @@ void PiPNet::normalize_(Mat img)
 	}
 }
 
-void PiPNet::nms(vector<BoxInfo>& input_boxes)
+void YOLOv5::nms(vector<BoxInfo>& input_boxes)
 {
 	sort(input_boxes.begin(), input_boxes.end(), [](BoxInfo a, BoxInfo b) { return a.score > b.score; }); // 降序排列
 	vector<float> vArea(input_boxes.size());
@@ -170,7 +170,7 @@ void PiPNet::nms(vector<BoxInfo>& input_boxes)
 	// input_boxes.erase(remove_if(input_boxes.begin(), input_boxes.end(), [&idx_t, &remove_flags](const BoxInfo& f) { return remove_flags[idx_t++]; }), input_boxes.end());
 }
 
-void PiPNet::detect(Mat& frame)
+void YOLOv5::detect(Mat& frame)
 {
 	int newh = 0, neww = 0, padh = 0, padw = 0;
 	Mat dstimg = this->resize_image(frame, &newh, &neww, &padh, &padw);
