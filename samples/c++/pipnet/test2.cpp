@@ -12,17 +12,21 @@
 #include <ctime>
 #include "face_keypoints.hpp"
 
+using namespace std;
+using namespace cv;
+using namespace cv::dnn;
+
 
 // 图像处理  标准化处理
-void PreProcess(const cv::Mat& image, cv::Mat& image_blob)
+void PreProcess(const Mat& image, Mat& image_blob)
 {
-	cv::Mat input;
+	Mat input;
 	image.copyTo(input);
 
 	//数据处理 标准化
-	std::vector<cv::Mat> channels, channel_p;
-	cv::split(input, channels);
-	cv::Mat R, G, B;
+	std::vector<Mat> channels, channel_p;
+	split(input, channels);
+	Mat R, G, B;
 	B = channels.at(0);
 	G = channels.at(1);
 	R = channels.at(2);
@@ -38,8 +42,8 @@ void PreProcess(const cv::Mat& image, cv::Mat& image_blob)
 	channel_p.push_back(G);
 	channel_p.push_back(B);
 
-	cv::Mat outt;
-	cv::merge(channel_p, outt);
+	Mat outt;
+	merge(channel_p, outt);
 	image_blob = outt;
 }
 
@@ -107,8 +111,8 @@ int main(int argc, char* argv[])
         auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
         ONNXTensorElementDataType type = tensor_info.GetElementType();
         printf("Input %d : type=%d\n", i, type);
+        //打印输入节点的维度
         input_node_dims = tensor_info.GetShape();
-        //输入节点的打印维度
         printf("Input %d : num_dims=%zu\n", i, input_node_dims.size());
         //打印各个维度的大小
         for (int j = 0; j < input_node_dims.size(); j++)
@@ -133,7 +137,7 @@ int main(int argc, char* argv[])
         printf("Output: %d type=%d\n", i, type);
         auto output_node_dims = tensor_info.GetShape();
         printf("Output: %d num_dims=%zu\n", i, output_node_dims.size());
-        for (int j = 0; j < input_node_dims.size(); j++)
+        for (int j = 0; j < output_node_dims.size(); j++)
         {
             printf("Output: %d dim %d=%jd\n", i, j, output_node_dims[j]);
         }
@@ -155,15 +159,44 @@ int main(int argc, char* argv[])
     // Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_tensor_values.data(), input_tensor_size, input_shape.data(), 4);
     // assert(input_tensor.IsTensor());
 
+    int camera_device = parser.get<int>("camera");
+    VideoCapture capture;
+    //-- 2. Read the video stream
+    capture.open( camera_device );
+    if ( ! capture.isOpened() )
+    {
+        cout << "--(!)Error opening video capture\n";
+        return -1;
+    }
+
+    Mat frame;
+    while ( capture.read(frame) )
+    {
+        if( frame.empty() )
+        {
+            cout << "--(!) No captured frame -- Break!\n";
+            break;
+        }
+
+        //-- 3. Apply the classifier to the frame
+        detectAndDisplay( frame );
+
+        if( waitKey(10) == 27 )
+        {
+            break; // escape
+        }
+    }
+
+
 	//加载图片
     int rewight = 256;
     int reheight = 256;
-	cv::Mat img = cv::imread("/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/data/demo.jpeg");
-	cv::Mat det1, det2;
-	cv::resize(img, det1, cv::Size(rewight, reheight), cv::INTER_AREA);
+	Mat img = imread("/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/data/demo.jpeg");
+	Mat det1, det2;
+	resize(img, det1, Size(rewight, reheight), INTER_AREA);
 	det1.convertTo(det1, CV_32FC3);
 	PreProcess(det1, det2);         //标准化处理
-	cv::Mat blob = cv::dnn::blobFromImage(det2, 1., cv::Size(rewight, reheight), cv::Scalar(0, 0, 0), true, CV_8U);
+	Mat blob = dnn::blobFromImage(det2, 1., Size(rewight, reheight), Scalar(0, 0, 0), true, CV_8U);
 	printf("Load imgs success!\n");
 
 	//创建输入tensor
@@ -179,15 +212,16 @@ int main(int argc, char* argv[])
 	    startTime = clock();
         auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_node_names.data(), input_tensors.data(), input_node_names.size(), output_node_names.data(), output_node_names.size());
         assert(output_tensors.size() == num_output_nodes && output_tensors.front().IsTensor());
-        printf("Number of outputs = %d\n", output_tensors.size());
+        printf("Number of outputs = %d\n", output_tensors.size());  // 输出的节点数
         endTime = clock();
 
         // Get pointer to output tensor float values
         for (int i = 0; i < num_output_nodes; i++)
         {
-            float* floatarr = output_tensors[i].GetTensorMutableData<float>();
-            printf("Output_tensors value = %.5f\n", floatarr);
-            std::cout << "Output_tensors front: " << floatarr[i] << std::endl;
+            // float* floatarr = output_tensors[i].GetTensorMutableData<float>();
+            std::cout << "output_tensor_size: " << output_tensors[i].GetTensorTypeAndShapeInfo().GetShape().size() << std::endl;   // 输出当前节点的维度大小
+            // std::cout << "output_tensor_size: " << output_tensors[i].GetTensorData<float>() << std::endl;   //
+            // std::cout << "Output_tensors lens: " << output_tensors[i] << std::endl;
         }
     }
 
