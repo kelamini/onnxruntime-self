@@ -6,7 +6,7 @@ YOLOv5::YOLOv5(Configuration config)
 	this->confThreshold = config.confThreshold;
 	this->nmsThreshold = config.nmsThreshold;
 	this->objThreshold = config.objThreshold;
-	this->num_classes = sizeof(this->classes)/sizeof(this->classes[0]);  // 类别数量
+	this->num_classes = sizeof(this->classes)/sizeof(this->classes[0]);  // 类别数量 80
 	this->inpHeight = 640;
 	this->inpWidth = 640;
 
@@ -41,12 +41,13 @@ YOLOv5::YOLOv5(Configuration config)
 		Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
 		auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
 		auto output_dims = output_tensor_info.GetShape();
+		// std::cout << "output_dims: " << output_dims.size() << std::endl;
 		output_node_dims.push_back(output_dims);
 	}
 	this->inpHeight = input_node_dims[0][2];
 	this->inpWidth = input_node_dims[0][3];
-	this->nout = output_node_dims[0][2];      // 5+classes
-	this->num_proposal = output_node_dims[0][1];  // pre_box
+	this->nout = output_node_dims[0][2];      // (x, y, w, h) + score + classes = 4 + 1 + 80 = 85
+	this->num_proposal = output_node_dims[0][1];  // pre_box = 25200
 
 }
 
@@ -102,13 +103,12 @@ void YOLOv5::normalize_(Mat img)
 void YOLOv5::nms(vector<BoxInfo>& input_boxes)
 {
 	sort(input_boxes.begin(), input_boxes.end(), [](BoxInfo a, BoxInfo b) { return a.score > b.score; }); // 降序排列
-	vector<float> vArea(input_boxes.size());
+	vector<float> vArea(input_boxes.size());	// 存放 bbox 面积
 	for (int i = 0; i < input_boxes.size(); ++i)
 	{
-		vArea[i] = (input_boxes[i].x2 - input_boxes[i].x1 + 1)
-			* (input_boxes[i].y2 - input_boxes[i].y1 + 1);
+		vArea[i] = (input_boxes[i].x2 - input_boxes[i].x1 + 1) * (input_boxes[i].y2 - input_boxes[i].y1 + 1);
 	}
-	// 全初始化为false，用来作为记录是否保留相应索引下pre_box的标志vector
+	// 全初始化为 false，用来作为记录是否保留相应索引下 pre_box 的标志 vector
 	vector<bool> isSuppressed(input_boxes.size(), false);
 	for (int i = 0; i < input_boxes.size(); ++i)
 	{
@@ -178,6 +178,7 @@ void YOLOv5::detect(Mat& frame)
 	int newh = 0, neww = 0, padh = 0, padw = 0;
 	Mat dstimg = this->resize_image(frame, &newh, &neww, &padh, &padw);
 	this->normalize_(dstimg);
+
 	// 定义一个输入矩阵，int64_t是下面作为输入参数时的类型
 	array<int64_t, 4> input_shape_{ 1, 3, this->inpHeight, this->inpWidth };
 
@@ -187,19 +188,23 @@ void YOLOv5::detect(Mat& frame)
 
 	// 开始推理
 	vector<Value> ort_outputs = ort_session->Run(RunOptions{ nullptr }, &input_names[0], &input_tensor_, 1, output_names.data(), output_names.size());   // 开始推理
-	/////generate proposals
+
+	// generate proposals
 	vector<BoxInfo> generate_boxes;  // BoxInfo自定义的结构体
+
 	float ratioh = (float)frame.rows / newh, ratiow = (float)frame.cols / neww;
+
 	float* pdata = ort_outputs[0].GetTensorMutableData<float>(); // GetTensorMutableData
-	for(int i = 0; i < num_proposal; ++i) // 遍历所有的num_pre_boxes
+
+	for (int i = 0; i < this->num_proposal; ++i) // 遍历所有的 num_pre_boxes=25200
 	{
-		int index = i * nout;      // prob[b*num_pred_boxes*(classes+5)]
+		int index = i * this->nout;      // prob[b*num_pred_boxes*(80+5)]=85
 		float obj_conf = pdata[index + 4];  // 置信度分数
 		if (obj_conf > this->objThreshold)  // 大于阈值
 		{
 			int class_idx = 0;
 			float max_class_socre = 0;
-			for (int k = 0; k < this->num_classes; ++k)
+			for (int k = 0; k < this->num_classes; ++k)		// 获取 80 类中最大类别分数
 			{
 				if (pdata[k + index + 5] > max_class_socre)
 				{
@@ -211,10 +216,10 @@ void YOLOv5::detect(Mat& frame)
 			if (max_class_socre > this->confThreshold) // 再次筛选
 			{
 				//const int class_idx = classIdPoint.x;
-				float cx = pdata[index];  //x
-				float cy = pdata[index+1];  //y
-				float w = pdata[index+2];  //w
-				float h = pdata[index+3];  //h
+				float cx = pdata[index];  	// xc
+				float cy = pdata[index+1];  // yc
+				float w = pdata[index+2];  	// w
+				float h = pdata[index+3];  	// h
 
 				float xmin = (cx - padw - 0.5 * w)*ratiow;
 				float ymin = (cy - padh - 0.5 * h)*ratioh;
@@ -229,6 +234,7 @@ void YOLOv5::detect(Mat& frame)
 	// Perform non maximum suppression to eliminate redundant overlapping boxes with
 	// lower confidences
 	nms(generate_boxes);
+
 	for (size_t i = 0; i < generate_boxes.size(); ++i)
 	{
 		int xmin = int(generate_boxes[i].x1);

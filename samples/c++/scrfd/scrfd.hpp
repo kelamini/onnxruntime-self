@@ -14,7 +14,6 @@ using namespace std;
 using namespace cv;
 using namespace Ort;
 
-
 // 自定义配置结构
 struct Configuration
 {
@@ -86,8 +85,8 @@ private:
 	Session *ort_session = nullptr;    // 初始化Session指针选项
 	SessionOptions sessionOptions = SessionOptions();  //初始化Session对象
 	//SessionOptions sessionOptions;
-	vector<char*> input_names;  // 定义一个字符指针vector
-	vector<char*> output_names; // 定义一个字符指针vector
+	vector<const char*> input_names = {"images"};  // 定义一个字符指针vector
+	vector<const char*> output_names = {"output"}; // 定义一个字符指针vector
 	vector<vector<int64_t>> input_node_dims; // >=1 outputs，二维vector
 	vector<vector<int64_t>> output_node_dims; // >=1 outputs，int64_t C/C++标准
 };

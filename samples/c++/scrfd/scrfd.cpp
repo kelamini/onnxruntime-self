@@ -7,8 +7,8 @@ YOLOv5::YOLOv5(Configuration config)
 	this->nmsThreshold = config.nmsThreshold;
 	this->objThreshold = config.objThreshold;
 	this->num_classes = sizeof(this->classes)/sizeof(this->classes[0]);  // 类别数量
-	this->inpHeight = 640;
-	this->inpWidth = 640;
+	this->inpHeight = 432;
+	this->inpWidth = 768;
 
 	string model_path = config.modelpath;
 	//std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  //用于UTF-16编码的字符
@@ -18,28 +18,38 @@ YOLOv5::YOLOv5(Configuration config)
     // OrtSessionOptionsAppendExecutionProvider_CUDA(sessionOptions, 0);
 
 	sessionOptions.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);  //设置图优化类型
-	//ort_session = new Session(env, widestr.c_str(), sessionOptions);  // 创建会话，把模型加载到内存中
-	//ort_session = new Session(env, (const ORTCHAR_T*)model_path.c_str(), sessionOptions); // 创建会话，把模型加载到内存中
+
+	// 创建会话，把模型加载到内存中
+	//ort_session = new Session(env, widestr.c_str(), sessionOptions);
+	//ort_session = new Session(env, (const ORTCHAR_T*)model_path.c_str(), sessionOptions);
 	ort_session = new Session(env, (const char*)model_path.c_str(), sessionOptions);
-	size_t numInputNodes = ort_session->GetInputCount();  //输入输出节点数量
+
+	//输入输出节点数量
+	size_t numInputNodes = ort_session->GetInputCount();
 	size_t numOutputNodes = ort_session->GetOutputCount();
-	AllocatorWithDefaultOptions allocator;   // 配置输入输出节点内存
+
+	// 配置输入输出节点内存
+	AllocatorWithDefaultOptions allocator;
+
+	// 输入节点
 	for (int i = 0; i < numInputNodes; i++)
 	{
-		input_names.push_back(ort_session->GetInputNameAllocated(i, allocator).get());		// 内存
+		// input_names.push_back(ort_session->GetInputNameAllocated(i, allocator).get());		// 内存
 		Ort::TypeInfo input_type_info = ort_session->GetInputTypeInfo(i);   // 类型
 		auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();  //
 		auto input_dims = input_tensor_info.GetShape();    // 输入shape
 		input_node_dims.push_back(input_dims);	// 保存
 	}
+	// 输出节点
 	for (int i = 0; i < numOutputNodes; i++)
 	{
-		output_names.push_back(ort_session->GetOutputNameAllocated(i, allocator).get());
+		// output_names.push_back(ort_session->GetOutputNameAllocated(i, allocator).get());
 		Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
 		auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
 		auto output_dims = output_tensor_info.GetShape();
 		output_node_dims.push_back(output_dims);
 	}
+
 	this->inpHeight = input_node_dims[0][2];
 	this->inpWidth = input_node_dims[0][3];
 	this->nout = output_node_dims[0][2];      // 5+classes
@@ -135,47 +145,16 @@ void YOLOv5::nms(vector<BoxInfo>& input_boxes)
 	int idx_t = 0;
        // remove_if()函数 remove_if(beg, end, op) //移除区间[beg,end)中每一个“令判断式:op(elem)获得true”的元素
 	input_boxes.erase(remove_if(input_boxes.begin(), input_boxes.end(), [&idx_t, &isSuppressed](const BoxInfo& f) { return isSuppressed[idx_t++]; }), input_boxes.end());
-	// 另一种写法
-	// sort(input_boxes.begin(), input_boxes.end(), [](BoxInfo a, BoxInfo b) { return a.score > b.score; }); // 降序排列
-	// vector<bool> remove_flags(input_boxes.size(),false);
-	// auto iou = [](const BoxInfo& box1,const BoxInfo& box2)
-	// {
-	// 	float xx1 = max(box1.x1, box2.x1);
-	// 	float yy1 = max(box1.y1, box2.y1);
-	// 	float xx2 = min(box1.x2, box2.x2);
-	// 	float yy2 = min(box1.y2, box2.y2);
-	// 	// 交集
-	// 	float w = max(0.0f, xx2 - xx1 + 1);
-	// 	float h = max(0.0f, yy2 - yy1 + 1);
-	// 	float inter_area = w * h;
-	// 	// 并集
-	// 	float union_area = max(0.0f,box1.x2-box1.x1) * max(0.0f,box1.y2-box1.y1)
-	// 					   + max(0.0f,box2.x2-box2.x1) * max(0.0f,box2.y2-box2.y1) - inter_area;
-	// 	return inter_area / union_area;
-	// };
-	// for (int i = 0; i < input_boxes.size(); ++i)
-	// {
-	// 	if(remove_flags[i]) continue;
-	// 	for (int j = i + 1; j < input_boxes.size(); ++j)
-	// 	{
-	// 		if(remove_flags[j]) continue;
-	// 		if(input_boxes[i].label == input_boxes[j].label && iou(input_boxes[i],input_boxes[j])>=this->nmsThreshold)
-	// 		{
-	// 			remove_flags[j] = true;
-	// 		}
-	// 	}
-	// }
-	// int idx_t = 0;
-    // // remove_if()函数 remove_if(beg, end, op) //移除区间[beg,end)中每一个“令判断式:op(elem)获得true”的元素
-	// input_boxes.erase(remove_if(input_boxes.begin(), input_boxes.end(), [&idx_t, &remove_flags](const BoxInfo& f) { return remove_flags[idx_t++]; }), input_boxes.end());
 }
 
 void YOLOv5::detect(Mat& frame)
 {
+	// 图像初始化
 	int newh = 0, neww = 0, padh = 0, padw = 0;
 	Mat dstimg = this->resize_image(frame, &newh, &neww, &padh, &padw);
 	this->normalize_(dstimg);
-	// 定义一个输入矩阵，int64_t是下面作为输入参数时的类型
+
+	// 定义一个输入矩阵，int64_t 是下面作为输入参数时的类型
 	array<int64_t, 4> input_shape_{ 1, 3, this->inpHeight, this->inpWidth };
 
     //创建输入tensor
@@ -184,11 +163,15 @@ void YOLOv5::detect(Mat& frame)
 
 	// 开始推理
 	vector<Value> ort_outputs = ort_session->Run(RunOptions{ nullptr }, &input_names[0], &input_tensor_, 1, output_names.data(), output_names.size());   // 开始推理
-	/////generate proposals
-	vector<BoxInfo> generate_boxes;  // BoxInfo自定义的结构体
+
+	// generate proposals
+	vector<BoxInfo> generate_boxes;  // BoxInfo 自定义的结构体
+
 	float ratioh = (float)frame.rows / newh, ratiow = (float)frame.cols / neww;
+
 	float* pdata = ort_outputs[0].GetTensorMutableData<float>(); // GetTensorMutableData
-	for(int i = 0; i < num_proposal; ++i) // 遍历所有的num_pre_boxes
+
+	for (int i = 0; i < this->num_proposal; ++i) // 遍历所有的 num_pre_boxes
 	{
 		int index = i * nout;      // prob[b*num_pred_boxes*(classes+5)]
 		float obj_conf = pdata[index + 4];  // 置信度分数
@@ -208,10 +191,10 @@ void YOLOv5::detect(Mat& frame)
 			if (max_class_socre > this->confThreshold) // 再次筛选
 			{
 				//const int class_idx = classIdPoint.x;
-				float cx = pdata[index];  //x
-				float cy = pdata[index+1];  //y
-				float w = pdata[index+2];  //w
-				float h = pdata[index+3];  //h
+				float cx = pdata[index];  	// x
+				float cy = pdata[index+1];  // y
+				float w = pdata[index+2];  	// w
+				float h = pdata[index+3];  	// h
 
 				float xmin = (cx - padw - 0.5 * w)*ratiow;
 				float ymin = (cy - padh - 0.5 * h)*ratioh;
@@ -233,6 +216,6 @@ void YOLOv5::detect(Mat& frame)
 		rectangle(frame, Point(xmin, ymin), Point(int(generate_boxes[i].x2), int(generate_boxes[i].y2)), Scalar(0, 0, 255), 2);
 		string label = format("%.2f", generate_boxes[i].score);
 		label = this->classes[generate_boxes[i].label] + ":" + label;
-		putText(frame, label, Point(xmin, ymin - 5), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0, 255, 0), 1);
+		putText(frame, label, Point(xmin, ymin - 5), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 0, 255), 2);
 	}
 }

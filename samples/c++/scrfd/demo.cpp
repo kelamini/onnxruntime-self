@@ -1,27 +1,56 @@
 #include "scrfd.hpp"
 
+
 int main(int argc,char *argv[])
 {
-	clock_t startTime,endTime;	//计算时间
-	Configuration yolo_nets = { 0.3, 0.5, 0.3, "yolov5s.onnx" };
-	string imgpath = "bus.jpg";
-	YOLOv5 yolo_model(yolo_nets);
-	Mat srcimg = imread(imgpath);
+	// string onnxpath = "/home/kelamini/workspace/onnxruntime/samples/c++/yolov5/weights_onnx/yolov5s.onnx";
+	string onnxpath = "/home/kelamini/workspace/onnxruntime/samples/c++/scrfd/weights_onnx/scrfd_768_432.onnx";
 
-	double timeStart = (double)getTickCount();
-	startTime = clock();	//计时开始
-	yolo_model.detect(srcimg);
-	endTime = clock();		//计时结束
-	double nTime = ((double)getTickCount() - timeStart) / getTickFrequency();
-	cout << "clock_running time is:" <<(double)(endTime - startTime) / CLOCKS_PER_SEC << "s" << endl;
-    cout << "The run time is:" << (double)clock() /CLOCKS_PER_SEC<< "s" << endl;
-	cout << "getTickCount_running time :" << nTime << "sec\n" << endl;
-	// static const string kWinName = "Deep learning object detection in ONNXRuntime";
-	// namedWindow(kWinName, WINDOW_NORMAL);
-	// imshow(kWinName, srcimg);
-	// waitKey(0);
-	// destroyAllWindows();
-	imwrite("restult_ort.jpg",srcimg);
+
+	clock_t startTime, endTime;	//计算时间
+	Configuration yolo_nets = { 0.3, 0.5, 0.3, onnxpath };
+	YOLOv5 yolo_model(yolo_nets);
+
+    VideoCapture capture;
+    capture.open( 0 );
+    if ( ! capture.isOpened() )
+    {
+        cout << "--(!)Error opening video capture\n";
+        return -1;
+    }
+
+    Mat srcimg;
+    while ( capture.read(srcimg) )
+    {
+        if( srcimg.empty() )
+        {
+            cout << "--(!) No captured frame -- Break!\n";
+            break;
+        }
+
+        if( waitKey(1) == 27 )
+        {
+            break; // escape
+        }
+
+		double timeStart = (double)getTickCount();
+		startTime = clock();	//计时开始
+		yolo_model.detect(srcimg);
+		endTime = clock();		//计时结束
+
+		// fps
+        double fps = capture.get(CAP_PROP_FPS);
+        string fps_str = to_string((int)fps);
+        putText(srcimg, "FPS: "+fps_str, Point(50, 50), 2, 1, Scalar(255, 0, 0), 1);
+
+		double nTime = ((double)getTickCount() - timeStart) / getTickFrequency();
+		cout << "clock_running time is:" <<(double)(endTime - startTime) / CLOCKS_PER_SEC << " s" << endl;
+		cout << "The run time is:" << (double)clock() /CLOCKS_PER_SEC<< " s" << endl;
+		cout << "getTickCount_running time :" << nTime << " sec" << endl;
+
+		static const string kWinName = "Deep learning object detection in ONNXRuntime";
+		imshow(kWinName, srcimg);
+	}
 
 	return 0;
 }
