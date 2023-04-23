@@ -8,7 +8,7 @@ int main(int argc,char *argv[])
 
 
 	clock_t startTime, endTime;	//计算时间
-	Configuration yolo_nets = { 0.3, 0.5, 0.3, onnxpath };
+	Configuration yolo_nets = { 0.6, 0.8, onnxpath };
 	YOLOv5 yolo_model(yolo_nets);
 
     VideoCapture capture;
@@ -49,7 +49,7 @@ int main(int argc,char *argv[])
 		cout << "getTickCount_running time :" << nTime << " sec" << endl;
 
 		static const string kWinName = "Deep learning object detection in ONNXRuntime";
-		imshow(kWinName, srcimg);
+		// imshow(kWinName, srcimg);
 	}
 
 	return 0;

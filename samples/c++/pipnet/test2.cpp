@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
     // const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/scrfd_768_432.onnx";
 #else
 	// const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/pipnet_mv3_wflw98_256x256_sim.onnx";
-    const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/pipnet/weights_onnx/scrfd_768_432.onnx";
+    const char* model_path = "/home/kelamini/workspace/onnxruntime/samples/c++/scrfd/weights_onnx/scrfd_768_432.onnx";
 #endif
 
     // 创建Session并把模型加载到内存中
@@ -120,6 +120,7 @@ int main(int argc, char* argv[])
         }
     }
     //打印输出节点信息
+    vector<vector<int64_t>> output_node_dimss;
     for (int i = 0; i < num_output_nodes; i++)
     {
         Ort::AllocatedStringPtr output_name_Ptr = session.GetOutputNameAllocated(i, allocator);
@@ -131,6 +132,7 @@ int main(int argc, char* argv[])
         ONNXTensorElementDataType type = tensor_info.GetElementType();
         printf("Output: %d type=%d\n", i, type);
         auto output_node_dims = tensor_info.GetShape();
+		output_node_dimss.push_back(output_node_dims);
         printf("Output: %d num_dims=%zu\n", i, output_node_dims.size());
         for (int j = 0; j < output_node_dims.size(); j++)
         {
@@ -183,7 +185,7 @@ int main(int argc, char* argv[])
         resize(img, det1, Size(rewidth, reheight), INTER_AREA);
         det1.convertTo(det1, CV_32FC3);
         PreProcess(det1, det2);         //标准化处理
-        Mat blob = dnn::blobFromImage(det2, 1., Size(rewidth, reheight), Scalar(0, 0, 0), true, CV_8U);
+        Mat blob = dnn::blobFromImage(det2, 1., Size(rewidth, reheight), Scalar(0, 0, 0), true);
         printf("Preprocess success!\n");
 
         //创建输入tensor
@@ -202,15 +204,56 @@ int main(int argc, char* argv[])
             printf("Number of outputs = %ld\n", output_tensors.size());  // 输出的节点数
             endTime = clock();
 
-            // Get pointer to output tensor float values
-            for (int i = 0; i < num_output_nodes; i++)
+            // // Get pointer to output tensor float values
+            // for (int i = 0; i < num_output_nodes; i++)
+            // {
+            //     // float* floatarr = output_tensors[i].GetTensorMutableData<float>();
+            //     std::cout << "output_tensor_size: " << output_tensors[i].GetTensorTypeAndShapeInfo().GetShape().size() << std::endl;   // 输出当前节点的维度大小
+            //     // std::cout << "Output_tensors lens: " << output_tensors[i] << std::endl;
+            // }
+            for (int n = 0; n < 3; n++)
             {
-                // float* floatarr = output_tensors[i].GetTensorMutableData<float>();
-                std::cout << "output_tensor_size: " << output_tensors[i].GetTensorTypeAndShapeInfo().GetShape().size() << std::endl;   // 输出当前节点的维度大小
-                // std::cout << "Output_tensors lens: " << output_tensors[i] << std::endl;
+                Ort::Value &score_8 = output_tensors.at(n);
+                Ort::Value &bbox_8 = output_tensors.at(n+3);
+
+                for (int i = 0; i < output_node_dimss[n][2]; i++)
+                {
+                    for (int j = 0; j < output_node_dimss[n][3]; j++)
+                    {
+                        std::cout << "===> output_node_dimss[h, w]: " << output_node_dimss[n][2] << ", " << output_node_dimss[n][3] << std::endl;
+
+                        float confs = score_8.At<float>({0, 0, i, j});
+                        // std::cout << "confs: " << confs << std::endl;
+                        if (confs > 0.2) // 再次筛选
+                        {
+                        std::cout << "===> confs: " << confs << std::endl;
+                        float cor_cx = bbox_8.At<float>({0, 0, i, j});
+                        std::cout << "cor_x: " << cor_cx << std::endl;
+                        float cor_cy = bbox_8.At<float>({0, 1, i, j});
+                        std::cout << "cor_y: " << cor_cy << std::endl;
+                        float cor_w = bbox_8.At<float>({0, 2, i, j});
+                        std::cout << "cor_w: " << cor_w << std::endl;
+                        float cor_h = bbox_8.At<float>({0, 3, i, j});
+                        std::cout << "cor_h: " << cor_w << std::endl;
+                        }
+                        float confs2 = score_8.At<float>({0, 1, i, j});
+                        // std::cout << "confs: " << confs << std::endl;
+                        if (confs2 > 0.2) // 再次筛选
+                        {
+                        std::cout << "===> confs2: " << confs2 << std::endl;
+                        float cor_cx2 = bbox_8.At<float>({0, 4, i, j});
+                        std::cout << "cor_x2: " << cor_cx2 << std::endl;
+                        float cor_cy2 = bbox_8.At<float>({0, 5, i, j});
+                        std::cout << "cor_y2: " << cor_cy2 << std::endl;
+                        float cor_w2 = bbox_8.At<float>({0, 6, i, j});
+                        std::cout << "cor_w2: " << cor_w2 << std::endl;
+                        float cor_h2 = bbox_8.At<float>({0, 7, i, j});
+                        std::cout << "cor_h2: " << cor_w2 << std::endl;
+                        }
+                    }
+                }
             }
         }
-
         catch (Ort::Exception& e)
         {
             std::cout << "Error: " << e.what() << std::endl;

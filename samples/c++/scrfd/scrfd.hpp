@@ -20,7 +20,7 @@ struct Configuration
 	public:
 	float confThreshold; // Confidence threshold
 	float nmsThreshold;  // Non-maximum suppression threshold
-	float objThreshold;  //Object Confidence threshold
+	// float objThreshold;  //Object Confidence threshold
 	string modelpath;
 };
 
@@ -32,7 +32,7 @@ typedef struct BoxInfo
 	float x2;
 	float y2;
 	float score;
-	int label;
+	// int label;
 } BoxInfo;
 
 // int endsWith(string s, string sub) {
@@ -54,26 +54,13 @@ public:
 private:
 	float confThreshold;
 	float nmsThreshold;
-	float objThreshold;
+	// float objThreshold;
 	int inpWidth;
 	int inpHeight;
-	int nout;
-	int num_proposal;
-	int num_classes;
-	string classes[80] = {"person", "bicycle", "car", "motorbike", "aeroplane", "bus",
-							"train", "truck", "boat", "traffic light", "fire hydrant",
-							"stop sign", "parking meter", "bench", "bird", "cat", "dog",
-							"horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
-							"backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-							"skis", "snowboard", "sports ball", "kite", "baseball bat",
-							"baseball glove", "skateboard", "surfboard", "tennis racket",
-							"bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl",
-							"banana", "apple", "sandwich", "orange", "broccoli", "carrot",
-							"hot dog", "pizza", "donut", "cake", "chair", "sofa", "pottedplant",
-							"bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse",
-							"remote", "keyboard", "cell phone", "microwave", "oven", "toaster",
-							"sink", "refrigerator", "book", "clock", "vase", "scissors",
-							"teddy bear", "hair drier", "toothbrush"};
+	// vector<int64_t> nout;
+	// vector<int64_t> num_proposal;
+	// int num_classes;
+	// string classes[1] = {"face"};
 
 	const bool keep_ratio = true;
 	vector<float> input_image_;		// 输入图片
@@ -81,12 +68,22 @@ private:
 	void nms(vector<BoxInfo>& input_boxes);
 	Mat resize_image(Mat srcimg, int *newh, int *neww, int *top, int *left);
 
-	Env env = Env(ORT_LOGGING_LEVEL_ERROR, "yolov5-6.1"); // 初始化环境
+	Env env = Env(ORT_LOGGING_LEVEL_ERROR, "scrfd"); // 初始化环境
 	Session *ort_session = nullptr;    // 初始化Session指针选项
 	SessionOptions sessionOptions = SessionOptions();  //初始化Session对象
 	//SessionOptions sessionOptions;
-	vector<const char*> input_names = {"images"};  // 定义一个字符指针vector
-	vector<const char*> output_names = {"output"}; // 定义一个字符指针vector
+	vector<const char*> input_names = {"input.1"};  // 定义一个字符指针vector
+	vector<const char*> output_names = {"score_8",
+										"score_16",
+										"score_32",
+										"bbox_8",
+										"bbox_16",
+										"bbox_32",
+										"kps_8",
+										"kps_16",
+										"kps_32",}; // 定义一个字符指针vector
+	size_t numInputNodes;
+	size_t numOutputNodes;
 	vector<vector<int64_t>> input_node_dims; // >=1 outputs，二维vector
 	vector<vector<int64_t>> output_node_dims; // >=1 outputs，int64_t C/C++标准
 };
