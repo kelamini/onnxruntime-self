@@ -2,12 +2,17 @@
 #include <sstream>
 #include <iostream>
 
+// opencv
 // #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
+// onnxruntime
 // #include <cuda_provider_factory.h>   // 提供cuda加速
 #include <onnxruntime_cxx_api.h>	 // C或c++的api
+
+// torch
+#include <torch/torch.h>
 
 // 命名空间
 using namespace std;

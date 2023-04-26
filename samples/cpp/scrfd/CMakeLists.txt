@@ -22,11 +22,17 @@ include_directories(
 )
 
 find_package(OpenCV REQUIRED)
-
+find_package(Torch REQUIRED
+             NO_MODULE
+             PATHS /home/kelamini/workspace/libtorch
+             NO_DEFAULT_PATH)
 
 ADD_EXECUTABLE(scrfd_test  ${OBJ})
+
 # if(HAVE_TENSORRT_PROVIDER_FACTORY_H)
 #   target_compile_definitions(capi_test PRIVATE -DHAVE_TENSORRT_PROVIDER_FACTORY_H)
 # endif()
+
 target_link_libraries(scrfd_test onnxruntime)
 target_link_libraries(scrfd_test ${OpenCV_LIBS})
+target_link_libraries(scrfd_test ${TORCH_LIBRARIES})
